@@ -1,0 +1,88 @@
+name: release
+
+# 推一个 v* 标签就出包：构建 dist-min、跑测试、把 exe 挂到 Release 上。
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write # 上传 Release 资产需要写权限
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 缓存 cargo 与 target
+        uses: Swatinem/rust-cache@v2
+        with:
+          # 不同 profile 的产物分开缓存，避免 dist-min 覆盖 release
+          key: dist-min
+
+      - name: 校验标签与 Cargo.toml 版本一致
+        shell: pwsh
+        run: |
+          $meta = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          $version = ($meta.packages | Where-Object { $_.name -eq 'peripheral-battery-app' }).version
+          $tag = "${{ github.ref_name }}"
+          if ($tag -ne "v$version") {
+            throw "标签 $tag 与 Cargo.toml 里的版本 v$version 不一致，请先改版本号再打标签"
+          }
+          "版本校验通过：$tag"
+
+      - name: 测试
+        run: cargo test --workspace
+
+      - name: 构建 dist-min
+        run: cargo build --profile dist-min -p peripheral-battery-app
+
+      - name: 整理产物
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $src = "target/dist-min/外设电量显示.exe"
+          $dst = "dist/PeripheralBattery-${{ github.ref_name }}-x64.exe"
+          Copy-Item $src $dst
+          $size = [math]::Round((Get-Item $dst).Length / 1MB, 2)
+          "产物：$dst（$size MB）"
+
+      - name: 发布 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.exe
+          draft: false
+          prerelease: false
+          body: |
+            Windows 10/11 x64，单文件，免安装。
+
+            **下载后建议放到普通目录再运行**，例如
+            `%LOCALAPPDATA%\Programs\PeripheralBattery\`，
+            然后把它加入开机自启（托盘右键 → 自启）。
+            从工程目录、沙箱或某些受限环境启动时，进程会带受限令牌，
+            写 `HKCU\...\Run` 会被拒绝（表现为「写入开机自启失败，错误码 5」）。
+
+            - 左键托盘图标：显示/收起面板
+            - 右键：显示、自启、刷新间隔（5 分 / 30 分 / 60 分）、退出
+            - 面板右上：刷新、亮暗主题、收起
+            - 只允许一个实例；Explorer 重启后自动重挂托盘图标
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传构建日志（失败时）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            target/**/*.log
+          if-no-files-found: ignore

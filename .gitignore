@@ -1,0 +1,13 @@
+# 构建产物
+/target
+**/target
+*.pdb
+
+# Python 工具的字节码缓存
+__pycache__/
+*.pyc
+
+# 编辑器与本地笔记（不随仓库公开）
+.idea/
+.workbuddy/
+build.log

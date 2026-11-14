@@ -1,0 +1,72 @@
+[workspace]
+members = ["app"]
+resolver = "3"
+
+[package]
+name = "peripheral-battery"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.90"
+
+[dependencies]
+thiserror = "2.0.21"
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Threading",
+    "Win32_System_SystemInformation",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+    "Win32_Devices_HumanInterfaceDevice",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_UI_Shell",
+    "Win32_UI_HiDpi",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[profile.release]
+# 日常开发用这一档：不 LTO、并行代码生成，改一行只重编本 crate，几秒出结果。
+# 代价是 ~19 MB 的体积 —— 但那是最后一步才需要关心的事。
+opt-level = 3
+lto = false
+codegen-units = 16
+# 符号表对运行没影响，只是别把几百 MB 的调试信息拖进 target。
+strip = "debuginfo"
+
+[profile.dist]
+# 出包用这一档：`cargo build --profile dist`（实测 8.1 MB，release 是 12.2 MB）。
+# 整程序 LTO 把只在模板里用一次的代码内联掉，重复的 monomorphization 也合并；
+# opt-level="s" 再挤掉一点，代价是每帧光栅化略慢（面板常驻，能接受）。
+inherits = "release"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+
+[profile.dist-tiny]
+# dist 再把 panic 展开干掉（实测 6.4 MB）。
+#
+# panic=abort 省掉 unwinder 与每个函数的 landing pad；代价是「任何 panic 直接
+# 结束进程」，而不是被 gpui 的 catch_unwind 接住后继续画界面。
+inherits = "dist"
+panic = "abort"
+
+[profile.dist-min]
+# 最小体积档（实测 5.7 MB）：dist-tiny 再把优化目标从「小」换成「最小」。
+# 渲染量很小，opt-level="z" 带来的速度损失看不出来。
+inherits = "dist-tiny"
+opt-level = "z"
+
+[lints.clippy]
+# 不启用 pedantic：这个 crate 大量直接调用 Win32，`implicit borrow as raw pointer`
+# 之类的提示会把真正的问题埋掉。默认组 + 项目自己的约定更实用。
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+

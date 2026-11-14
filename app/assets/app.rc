@@ -1,0 +1,34 @@
+#pragma code_page(65001)
+
+// 图标：id 1 是 GPUI 注册窗口类时默认去取的资源号
+// （`LoadImageW(hInstance, MAKEINTRESOURCE(1), IMAGE_ICON, ...)`），
+// 没有它任务栏与 Alt+Tab 都会退回成一张空白默认图标。
+1 ICON "app.ico"
+
+1 VERSIONINFO
+FILEVERSION 0,1,0,0
+PRODUCTVERSION 0,1,0,0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS 0x40004L
+FILETYPE 0x1L
+FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "080404b0"
+        BEGIN
+            VALUE "CompanyName", "PeripheralBattery"
+            VALUE "FileDescription", "外设电量显示"
+            VALUE "FileVersion", "0.1.0"
+            VALUE "InternalName", "外设电量显示"
+            VALUE "OriginalFilename", "外设电量显示.exe"
+            VALUE "ProductName", "外设电量显示"
+            VALUE "ProductVersion", "0.1.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x804, 1200
+    END
+END
